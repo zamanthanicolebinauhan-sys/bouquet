@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>A little something for ya</title>
+<style>
+  :root { color-scheme: dark; box-sizing: border-box; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); background: #070810; }
+  body { margin: 0; background: #070810; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: Georgia, serif; }
+  canvas { max-width: 100%; height: auto; cursor: pointer; }
+  p { color: #7d8299; font-size: 14px; margin: 4px 0 16px; }
+</style>
+</head>
+<body>
+<canvas id="out"></canvas>
+<p>Tap to watch it bloom again</p>
+<script>
+const W = 280, H = 470, CELL_W = 4, CELL_H = 6, CHAR_W = 6, CHAR_H = 9;
+const RAMP = " .:-=+*#%@";
+const src = document.createElement("canvas"); src.width = W; src.height = H;
+const g = src.getContext("2d", { willReadFrequently: true });
+const clamp = v => Math.max(0, Math.min(1, v));
+const ease = t => t * t * (3 - 2 * t);
+
+function leaf(x, y, ang, len, s) {
+  g.save(); g.translate(140, 205); g.scale(s, s); g.translate(-140, -205);
+  g.translate(x, y); g.rotate(ang); g.fillStyle = "#8fd16b";
+  g.beginPath(); g.ellipse(len / 2, 0, len / 2, 11, 0, 0, 7); g.fill(); g.restore();
+}
+function cone(s) {
+  g.save(); g.translate(140, 330); g.scale(s, s); g.translate(-140, -330);
+  g.fillStyle = "#e07a2e";
+  g.beginPath(); g.moveTo(58, 175); g.lineTo(222, 175); g.lineTo(150, 330); g.lineTo(130, 330); g.fill();
+  g.strokeStyle = "#a8501c"; g.lineWidth = 3;
+  for (let i = -3; i <= 3; i++) { g.beginPath(); g.moveTo(140 + i * 22, 178); g.lineTo(140 + i * 3, 326); g.stroke(); }
+  g.fillStyle = "#4aa3ff"; g.fillRect(112, 285, 56, 12);
+  g.beginPath(); g.arc(122, 291, 11, 0, 7); g.arc(158, 291, 11, 0, 7); g.fill();
+  g.fillStyle = "#3fa23a"; g.fillRect(137, 328, 6, 36);
+  g.restore();
+}
+function flower(x, y, r, base, light, o) {
+  const R = r * o; if (R < 1) return;
+  for (let k = 0; k < 6; k++) {
+    const a = k * Math.PI / 3 + x;
+    g.fillStyle = k % 2 ? light : base;
+    g.beginPath(); g.arc(x + Math.cos(a) * R * .62, y + Math.sin(a) * R * .62, R * .5, 0, 7); g.fill();
+  }
+  g.fillStyle = "#ffb52e"; g.beginPath(); g.arc(x, y, R * .33, 0, 7); g.fill();
+}
+const flowers = [
+  [140, 62, 36, "#3f7bff", "#cfe4ff"], [92, 92, 31, "#6fb1ff", "#ffffff"], [190, 92, 31, "#4b6bff", "#9cc6ff"],
+  [58, 132, 27, "#3f7bff", "#9cc6ff"], [224, 132, 27, "#6fb1ff", "#ffffff"], [116, 122, 29, "#cfe4ff", "#4b8cff"],
+  [168, 126, 29, "#4b6bff", "#cfe4ff"], [140, 160, 27, "#6fb1ff", "#3f7bff"],
+];
+function scene(p) {
+  g.clearRect(0, 0, W, H);
+  const lp = ease(clamp((p - 0.2) / 0.3));
+  [[70, 200, -0.45, 70], [210, 200, Math.PI + 0.45, 70], [100, 215, -0.1, 62], [180, 215, Math.PI + 0.1, 62], [140, 195, -1.57, 50]]
+    .forEach(l => leaf(l[0] + (140 - l[0]) * (1 - lp), l[1], l[2], l[3], lp));
+  cone(ease(clamp(p / 0.25)));
+  flowers.forEach((f, i) => flower(f[0], f[1], f[2], f[3], f[4], ease(clamp((p - 0.3 - i * 0.07) / 0.25))));
+}
+
+const cols = Math.floor(W / CELL_W), rows = Math.floor(H / CELL_H);
+const out = document.getElementById("out"), o2 = out.getContext("2d");
+out.width = cols * CHAR_W; out.height = rows * CHAR_H;
+o2.font = "bold 9px monospace"; o2.textBaseline = "top";
+
+const cat = [" /\\___/\\ ", "(  owo  )", "(  ---  )", " /|<3 |\\ ", " (_) (_) "];
+const caption = "a little something for ya";
+const sparks = Array.from({ length: 45 }, () => ({ x: Math.random() * out.width, y: Math.random() * out.height, c: "+*.x·".charAt(Math.random() * 5 | 0), col: ["#ffd86b", "#7fd0ff", "#ff9ed2", "#9affc2"][Math.random() * 4 | 0], ph: Math.random() * 7 }));
+const hearts = Array.from({ length: 9 }, (_, i) => ({ x: 20 + Math.random() * (out.width - 40), sp: 0.02 + Math.random() * 0.025, off: Math.random() * 700, ph: i }));
+
+let start = performance.now();
+out.addEventListener("pointerdown", () => { start = performance.now(); });
+
+function text(s, x, y, color) {
+  o2.fillStyle = color;
+  for (let i = 0; i < s.length; i++) if (s[i] !== " ") o2.fillText(s[i], x + i * CHAR_W, y);
+}
+function frame(now) {
+  const t = now - start, p = clamp(t / 6000) * 1.05;
+  scene(p);
+  const px = g.getImageData(0, 0, W, H).data;
+  o2.fillStyle = "#070810"; o2.fillRect(0, 0, out.width, out.height);
+  sparks.forEach(s => { o2.globalAlpha = 0.25 + 0.75 * Math.abs(Math.sin(now / 700 + s.ph)); text(s.c, s.x, s.y, s.col); });
+  o2.globalAlpha = 1;
+  for (let row = 0; row < rows; row++) for (let col = 0; col < cols; col++) {
+    let r = 0, gr = 0, b = 0, n = 0;
+    for (let y = 0; y < CELL_H; y++) for (let x = 0; x < CELL_W; x++) {
+      const i = ((row * CELL_H + y) * W + col * CELL_W + x) * 4;
+      if (px[i + 3] > 40) { r += px[i]; gr += px[i + 1]; b += px[i + 2]; n++; }
+    }
+    if (n < CELL_W * CELL_H * 0.3) continue;
+    r /= n; gr /= n; b /= n;
+    const br = (0.299 * r + 0.587 * gr + 0.114 * b) / 255;
+    o2.fillStyle = `rgb(${r | 0},${gr | 0},${b | 0})`;
+    o2.fillText(RAMP[Math.min(RAMP.length - 1, Math.floor(br * RAMP.length))], col * CHAR_W, row * CHAR_H);
+  }
+  if (p > 0.9) {
+    const catX = (out.width - 9 * CHAR_W) / 2;
+    text("(!)", catX + 3 * CHAR_W, 548, "#8fd16b");
+    cat.forEach((l, i) => text(l, catX, 562 + i * 11, "#f2f2f8"));
+    hearts.forEach(h => {
+      const y = out.height - ((now * h.sp + h.off) % (out.height + 40));
+      o2.globalAlpha = 0.9; text("<3", h.x + Math.sin(now / 600 + h.ph) * 8, y, "#ff7aa8");
+    });
+    o2.globalAlpha = 1;
+    const n = Math.max(0, Math.floor((t - 6000) / 90));
+    text(caption.slice(0, n), (out.width - caption.length * CHAR_W) / 2, 650, "#7fd0ff");
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
