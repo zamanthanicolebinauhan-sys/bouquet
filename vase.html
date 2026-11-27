@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bouquet</title>
+<style>
+  :root { color-scheme: dark; box-sizing: border-box; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); background: #020204; }
+  body { margin: 0; background: #020204; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: Georgia, serif; }
+  canvas { max-width: 100%; height: auto; cursor: pointer; }
+  p { color: #6d7086; font-size: 14px; margin: 4px 0 16px; }
+</style>
+</head>
+<body>
+<canvas id="out"></canvas>
+<p>Tap to watch it grow again</p>
+<script>
+const W = 320, H = 408, CELL_W = 4, CELL_H = 6, CHAR_W = 6, CHAR_H = 9;
+const RAMP = " .'`^\",:;Il!i><~+_-?][}{1)(|tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$";
+const src = document.createElement("canvas"); src.width = W; src.height = H;
+const g = src.getContext("2d", { willReadFrequently: true });
+const clamp = v => Math.max(0, Math.min(1, v));
+const ease = t => t * t * (3 - 2 * t);
+const CX = 160;
+
+function stem(x, y, p) {
+  g.strokeStyle = "#35a84a"; g.lineWidth = 5; g.lineCap = "round";
+  g.beginPath(); g.moveTo(CX, 285);
+  g.quadraticCurveTo((x + CX) / 2, (y + 285) / 2 + 20, CX + (x - CX) * p, 285 + (y - 285) * p); g.stroke();
+}
+function leaf(x, y, ang, len, s) {
+  g.save(); g.translate(CX + (x - CX) * s, 285 + (y - 285) * s); g.rotate(ang); g.scale(s, s);
+  g.fillStyle = "#5fd35f"; g.beginPath(); g.ellipse(len / 2, 0, len / 2, 10, 0, 0, 7); g.fill(); g.restore();
+}
+function flower(x, y, r, c1, c2, kind, o) {
+  const R = r * o; if (R < 1) return;
+  if (kind === "rose") {
+    [[1, c1], [.78, c2], [.58, c1], [.4, c2], [.22, c1]].forEach(([k, c]) => { g.fillStyle = c; g.beginPath(); g.arc(x, y, R * k, 0, 7); g.fill(); });
+  } else {
+    for (let i = 0; i < 9; i++) {
+      g.save(); g.translate(x, y); g.rotate(i * Math.PI * 2 / 9); g.fillStyle = c1;
+      g.beginPath(); g.ellipse(R * .62, 0, R * .42, R * .2, 0, 0, 7); g.fill(); g.restore();
+    }
+    g.fillStyle = c2; g.beginPath(); g.arc(x, y, R * .3, 0, 7); g.fill();
+  }
+}
+function vase(s) {
+  g.save(); g.translate(CX, 395); g.scale(1, s); g.translate(-CX, -395);
+  g.fillStyle = "#3b6fe0"; g.fillRect(112, 372, 96, 22);
+  g.fillStyle = "#c2257a"; g.beginPath(); g.ellipse(CX, 330, 64, 48, 0, 0, 7); g.fill();
+  g.fillRect(138, 276, 44, 30);
+  g.fillStyle = "#ff6fb8"; g.beginPath(); g.ellipse(138, 318, 14, 24, 0.3, 0, 7); g.fill();
+  g.fillStyle = "#ffd23f"; g.fillRect(100, 336, 120, 7);
+  g.fillStyle = "#e8479a"; g.fillRect(132, 270, 56, 9);
+  g.restore();
+}
+const flowers = [
+  [160, 118, 46, "#e0243a", "#8a0f22", "rose"],
+  [100, 160, 38, "#ff5fa8", "#b02062", "rose"],
+  [220, 156, 36, "#ffd93a", "#e07a14", "daisy"],
+  [62, 212, 30, "#7a5cff", "#ffd93a", "daisy"],
+  [258, 212, 30, "#4a9bff", "#ffffff", "daisy"],
+  [160, 200, 34, "#ff8a3d", "#a8340f", "rose"],
+  [110, 100, 26, "#ffffff", "#ffd93a", "daisy"],
+  [214, 92, 26, "#ff6b6b", "#8a0f22", "rose"],
+];
+function scene(p) {
+  g.clearRect(0, 0, W, H);
+  g.globalAlpha = 1 - clamp((p - 0.4) / 0.2);
+  g.strokeStyle = "#35a84a"; g.lineWidth = 3; g.beginPath(); g.moveTo(CX, 0); g.lineTo(CX, 285 * ease(clamp(p / 0.15))); g.stroke();
+  g.globalAlpha = 1;
+  const sp = ease(clamp((p - 0.1) / 0.3)), lp = ease(clamp((p - 0.2) / 0.3));
+  flowers.forEach(f => stem(f[0], f[1], sp));
+  [[80, 235, -0.5, 70], [240, 235, Math.PI + 0.5, 70], [110, 255, -0.15, 60], [210, 255, Math.PI + 0.15, 60]].forEach(l => leaf(l[0], l[1], l[2], l[3], lp));
+  flowers.forEach((f, i) => flower(f[0], f[1], f[2], f[3], f[4], f[5], ease(clamp((p - 0.3 - i * 0.07) / 0.25))));
+  vase(ease(clamp(p / 0.2)));
+}
+
+const cols = Math.floor(W / CELL_W), rows = Math.floor(H / CELL_H);
+const out = document.getElementById("out"), o2 = out.getContext("2d");
+out.width = cols * CHAR_W; out.height = rows * CHAR_H;
+o2.font = "bold 9px monospace"; o2.textBaseline = "top";
+let start = performance.now();
+out.addEventListener("pointerdown", () => { start = performance.now(); });
+
+const R_ = new Float32Array(cols * rows), G_ = new Float32Array(cols * rows), B_ = new Float32Array(cols * rows), L_ = new Float32Array(cols * rows), A_ = new Uint8Array(cols * rows);
+
+function frame(now) {
+  const p = clamp((now - start) / 7000) * 1.05;
+  scene(p);
+  const px = g.getImageData(0, 0, W, H).data;
+  for (let row = 0; row < rows; row++) for (let col = 0; col < cols; col++) {
+    let r = 0, gr = 0, b = 0, n = 0;
+    for (let y = 0; y < CELL_H; y++) for (let x = 0; x < CELL_W; x++) {
+      const i = ((row * CELL_H + y) * W + col * CELL_W + x) * 4;
+      if (px[i + 3] > 40) { r += px[i]; gr += px[i + 1]; b += px[i + 2]; n++; }
+    }
+    const k = row * cols + col;
+    A_[k] = n >= CELL_W * CELL_H * 0.3 ? 1 : 0;
+    if (A_[k]) { R_[k] = r / n; G_[k] = gr / n; B_[k] = b / n; L_[k] = (0.299 * R_[k] + 0.587 * G_[k] + 0.114 * B_[k]) / 255; } else L_[k] = 0;
+  }
+  o2.fillStyle = "#020204"; o2.fillRect(0, 0, out.width, out.height);
+  for (let row = 1; row < rows - 1; row++) for (let col = 1; col < cols - 1; col++) {
+    const k = row * cols + col; if (!A_[k]) continue;
+    const gx = L_[k - 1 - cols] * -1 + L_[k + 1 - cols] + L_[k - 1] * -2 + L_[k + 1] * 2 + L_[k - 1 + cols] * -1 + L_[k + 1 + cols];
+    const gy = L_[k - 1 - cols] * -1 + L_[k - cols] * -2 + L_[k + 1 - cols] * -1 + L_[k - 1 + cols] + L_[k + cols] * 2 + L_[k + 1 + cols];
+    const mag = Math.hypot(gx, gy);
+    let ch;
+    if (mag > 0.9) {
+      const a = (Math.atan2(gy, gx) * 180 / Math.PI + 180) % 180;
+      ch = a < 22.5 || a >= 157.5 ? "|" : a < 67.5 ? "\\" : a < 112.5 ? "-" : "/";
+    } else {
+      const idx = Math.max(1, Math.min(RAMP.length - 1, Math.floor(L_[k] * (RAMP.length - 1)) + ((col * 7 + row * 13) % 3) - 1));
+      ch = RAMP[idx];
+    }
+    o2.fillStyle = `rgb(${Math.min(255, R_[k] * 1.25 + 25) | 0},${Math.min(255, G_[k] * 1.25 + 25) | 0},${Math.min(255, B_[k] * 1.25 + 25) | 0})`;
+    o2.fillText(ch, col * CHAR_W, row * CHAR_H);
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
